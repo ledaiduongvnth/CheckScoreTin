@@ -1,55 +1,72 @@
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-from DatasetPython import *
-layout = html.Div([
-    dcc.Tabs(
-        tabs=[{'label': i, 'value': i} for i in Tabs],
-        value='English student',
-        id='tabs',
-        style={
-        'width': '80%',
-        'fontFamily': 'Sans-Serif',
-        'margin-left': 'auto',
-        'margin-right': 'auto'}),
+import dash_table_experiments as dt
+from Dataset import *
 
-    dcc.Dropdown(
-        id = 'type_to_plot',
-        options=[
-        {'label': 'Score', 'value': 'Score'},
-        {'label': 'Type1', 'value': 'Type1'},
-        {'label': 'Type2', 'value': 'Type2'}],
-        value="Score"),
 
-    dcc.Graph(id='graph'),
+colors = {'background': '#111111','text': '#7FDBFF'}
 
-    html.H1('Your state'),
-    html.Div(id='state'),
-    html.H1('Choose role and subject'),
-    dcc.Dropdown(
-        id = 'role_and_subject',
-        options=[
-        {'label': 'None', 'value': 'None'},
-        {'label': 'Student', 'value': 'Student'},
-        {'label': 'Teacher', 'value': 'Teacher'},
-        {'label': 'English', 'value': 'English'},
-        {'label': 'Math', 'value': 'Math'},
-        {'label': 'Physics', 'value': 'Physics'}],
-        multi=True,
-        value="None"),
-    html.H1('Choose test number'),
-    dcc.Input(id='test_number', value='Test number', type= 'number'),
-    html.H1('Choose your anwers'),
-    # The firts 25 questions here
-    html.Div([dcc.Dropdown(id='input'+str(i), placeholder = "Question " + str(i)) for i in range(1, 26)], style = {'width': '38%','display': 'inline-block'}),
-    # The second 25 questions here
-    html.Div([dcc.Dropdown(id='input'+str(i), placeholder = "Question " + str(i)) for i in range(26, 51)],style = {'width': '38%','float': 'right','display': 'inline-block'}),
-    html.H1('Submit your anwers and see the sending status'),
+layout_home_page = html.Div([
+    html.H1(children='WELCOM TO MY PLATFORM',style={'textAlign': 'center', 'color': colors['text']}),
+    html.Div([dcc.Dropdown(id='subject_plot', options=[{'label': i, 'value': i} for i in Subjects], value='English', placeholder = 'Select subject')], style = {'width': '20%','display': 'inline-block'}),
+    html.Div([dcc.Link('TEACHER PAGE', href='/page_teacher'),html.Br(),dcc.Link('STUDENT PAGE', href='/page_student'),html.Br(),dcc.Link('LIST TESTS PAGE', href='/page_list_test')],style = {'width': '10%','float': 'right','display': 'inline-block'}),
+    html.Div(id='graphs')])
+
+layout_teacher = html.Div([
+    html.Div([dcc.Link('<-HOME', href='/'),html.Br(),dcc.Link('LIST TESTS PAGE', href='/page_list_test'),html.Br(), dcc.Dropdown(id='subject_teacher', options=[{'label': i, 'value': i} for i in Subjects], value=None, placeholder = 'Select subject'),
+              html.Div(id='state_teacher'), dcc.Input(id='test_number_teacher', type= 'number', placeholder = 'Enter test number')],
+             style = {'width': '20%','display': 'inline-block'}),
+    html.Div([html.H1('CONFIG ALGORITHM'),
+              html.Div([dcc.Dropdown(id='algorithm_teacher',options=[{'label':i,'value':i} for i in Algorithm], value='K nearest neighbor')]),
+              dcc.Slider(id='K_neighbors_teacher', min=1, max=9, marks={i:'K={}'.format(i) for i in range(1, 10)}, value=2)],
+             style={'width': '50%', 'float': 'right', 'display': 'inline-block'}),
+    html.H1('ENTER RIGHT ANSWERS'),
+    dcc.Input(
+        id='text_area_answers_teacher',
+        placeholder='Enter answers...',
+        type='text',
+        style={'width': '100%'}),
+    html.H1('ENTER EXAM TEXT'),
+    dcc.Textarea(
+        id='text_area_exam_teacher',
+        placeholder='Enter exam text',
+        style={'width': '100%', 'height': 300 }),
+    html.H1('EDIT THE TABLE'),
+    dt.DataTable(
+        rows=[{}],
+        row_selectable=True,
+        filterable=True,
+        sortable=True,
+        selected_row_indices=[],
+        editable=True,
+        id='table_teacher'),
+        html.Div(id='grammal', children = 'Noun Pronoun Adjective_Adverb Conjunction Articles_a_an_the Prepositions Phrasal_verb Verb Model_verb Verb_tenses Passive_voice Conditinal Gerund_infinitive_participle Tag_Question Inversion Relative_clause Direct_indirect_sentence Comparison Subject_verb_agreement Identify_formation_of_words '),
+    html.H1('SEND YOUR CATEGORIES AND SEE STATUS'),
         dcc.RadioItems(
-            id='complete_confirm',
-            options=[{'label': 'I have done', 'value':'I have done'}, {'label':'I have not done.............', 'value': 'I have not done' }],
+            id='complete_confirm_teacher',
+            options=[{'label': 'I have done', 'value':'I have done'}, {'label':'I have not done', 'value': 'I have not done' }],
             value= 'I have not done',
-            style={'display': 'inline-block'}),
-    html.Button(id='submit_button',type='n-clicks', children='Submit', style = {'display': 'inline-block'}),
-    html.Div(id='status', style = {'display': 'inline-block'})
+            style={'display': 'inline-block', 'float': 'right',}),
+    html.Button(id='submit_button_teacher',type='n-clicks', children='SEND', style = {'display': 'inline-block', 'float': 'right',}),
+    html.Div(id='status_teacher')
     ])
+
+layout_student = html.Div(
+    [html.Div([dcc.Link('<-HOME', href='/'),html.Br(),dcc.Link('LIST TESTS PAGE', href='/page_list_test'),html.Br(), dcc.Dropdown(id='subject_student', options=[{'label': i, 'value': i} for i in Subjects], value=None, placeholder = 'Select subject'),
+               html.Div(id='state_student'),
+               dcc.Input(id='test_number_student', type= 'number', placeholder = 'Enter test number'),],style = {'width': '20%','display': 'inline-block'}),
+    html.H1('CHOOSE YOUR ANSWERS'),
+    # The firts 25 questions here
+    html.Div([dcc.Dropdown(id='input'+str(i), options=[{'label': Option, 'value': Option} for Option in Options], placeholder = "Question " + str(i)) for i in range(1, 26)], style = {'width': '38%','display': 'inline-block'}),
+    # The second 25 questions here
+    html.Div([dcc.Dropdown(id='input'+str(i), options=[{'label': Option, 'value': Option} for Option in Options], placeholder = "Question " + str(i)) for i in range(26, 51)],style = {'width': '38%','float': 'right','display': 'inline-block'}),
+
+    html.Div([dcc.RadioItems(
+            id='complete_confirm_student',
+            options=[{'label': 'I have done', 'value':'I have done'}, {'label':'I have not done', 'value': 'I have not done' }],
+            value= 'I have not done',
+            style={'display': 'inline-block', 'float': 'right',}),
+    html.Button(id='submit_button_student',type='n-clicks', children='SEND'),
+    html.Div(id='status')],style = {'width': '20%','display': 'inline-block', 'float': 'right'})])
+
