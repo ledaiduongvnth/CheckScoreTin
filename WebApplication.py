@@ -1,11 +1,9 @@
-from NatureLanguageProcessing import *
 from LayoutWebApplication import *
 from LayoutListTests import *
-from Dataset import *
 import plotly.graph_objs as go
-app = dash.Dash();app.layout = layout_teacher
 from dash.dependencies import Input, Output, State
-import pandas as pd
+from ProcessData import *
+
 
 print(dcc.__version__) # 0.6.0 or above is required
 app = dash.Dash()
@@ -24,57 +22,81 @@ def display_page(pathname):
         return layout_student
     elif pathname == '/page_list_test':
         return layout_list_test
+    elif pathname == '/page_admin':
+        return layout_admin
     else:
         return layout_home_page
 # You could also return a 404 "URL not found" page here
 app.css.append_css({'external_url': 'https://codepen.io/chriddyp/pen/bWLwgP.css'})
+
+# //////////////////////////////////////////////////////////////////CallBack for admin page//////////////////////////////////////////////////////////////////////
+# Give user the his or her state to fill number of next test
+@app.callback(Output('state_admin', 'children'),[Input('subject_admin', 'value')])
+def GetState(subject):
+    try:
+        obj = GetAdminObject(subject)
+        number_done_test_your = obj.GetNumberOfDoneTests()
+    except KeyError:
+        return 'You need to select subject in above dropdown'
+    return 'You are doing test No ' + str(number_done_test_your + 1)
+
+@app.callback(  Output('table_admin', 'rows'),[Input('submit_button_admin', 'n_clicks')],
+                state=[State('test_number_admin', 'value'),State('complete_confirm_admin', 'value'),
+                       State('text_area_exam_admin', 'value'), State('text_area_answers_admin', 'value'),
+                       State('subject_admin', 'value')])
+def UpdateDataToDatabase(n_clicks, test_number, complete_confirm, text_exam, text_answers, subject):
+    if n_clicks != None:
+        obj = GetAdminObject(subject)
+        df_result = obj.UpdateDataToDatabase(text_answers, text_exam, test_number, complete_confirm)
+        print(df_result)
+    return df_result.to_dict('records')
+
 # /////////////////////////////////////////////////////////////////CallBack for home page/////////////////////////////////////////////////////////////////////////
-# @app.callback(Output('graphs','children'),[Input('subject_plot', 'value')])
-# def UpdateDataAndPlotGraphSecond(tab):
-#     obj = EnglishStudent() if tab == Subjects[0] else (MathStudent() if tab == Subjects[1] else PhysicsStudent())
-#     obj.UpdateAllTest()
-#     graph = [dcc.Graph(id='g',figure= {'data': obj.GetDataForGraphForClass(obj.file_preprocessed_data), 'layout': go.Layout(
-#                 title = 'PRESENTATION OF SCORES AND EFFECTIONCIES',
-#                 yaxis={'range': [0, 10]},
-#                 margin={'l': 20, 'b': 20, 't': 70, 'r': 20},
-#                 legend={'x': 1, 'y': 1},
-#             )})]
-#     data = obj.GetDataForGraphForClassSecond(obj.file_preprocessed_data, Categories[tab])
-#     graphs = [dcc.Graph(id= id,figure= {'data': data_i, 'layout': go.Layout(
-#                 title= id,
-#                 yaxis={'range': [0, 100]},
-#                 margin={'l': 20, 'b': 20, 't': 70, 'r': 20},
-#                 legend={'x': 1, 'y': 1},
-#             )})
-#               for id, data_i in zip(Categories[tab], data)]
-#     return graph + graphs
+@app.callback(Output('graphs','children'),[Input('subject_plot', 'value')])
+def UpdateDataAndPlotGraphSecond(tab):
+    obj = GetStudentObject(tab)
+    obj.UpdateAllTest()
+    graph = [dcc.Graph(id='g',figure= {'data': obj.GetDataForGraphForClass(obj.file_preprocessed_data), 'layout': go.Layout(
+                title = 'PRESENTATION OF SCORES AND EFFECIENCIES',
+                yaxis={'range': [0, 10]},
+                margin={'l': 20, 'b': 20, 't': 70, 'r': 20},
+                legend={'x': 1, 'y': 1},
+            )})]
+    data = obj.GetDataForGraphForClassSecond(obj.file_preprocessed_data, Categories[tab])
+    graphs = [dcc.Graph(id= id,figure= {'data': data_i, 'layout': go.Layout(
+                title= id,
+                yaxis={'range': [0, 100]},
+                margin={'l': 20, 'b': 20, 't': 70, 'r': 20},
+                legend={'x': 1, 'y': 1},
+            )})
+              for id, data_i in zip(Categories[tab], data)]
+    return graph + graphs
 # //////////////////////////////////////////////////////////////////CallBack for teacher page//////////////////////////////////////////////////////////////////////
 # Give user the his or her state to fill number of next test
 @app.callback(Output('state_teacher', 'children'),[Input('subject_teacher', 'value')])
 def GetState(subject):
     try:
-        number_done_test_your = int(len(SubFunctions().ReadDataFrameFromMySQL(FilesStudent[subject])) / NumberRowsOfOwnDataForOneTestStudent[subject])
-    except KeyError:
+        obj = GetTeacherObject(subject)
+        number_done_test_your = obj.GetNumberOfDoneTests(obj.file_raw_data, obj.number_rows_of_own_one_test)
+    except (KeyError, AttributeError):
         return 'You need to select subject in above dropdown'
-    return u'In this subject you have done {} test next be {}'.format(number_done_test_your,number_done_test_your+1)
+    return 'You are doing test No ' + str(number_done_test_your + 1)
 
-@app.callback(Output('table_teacher', 'rows'), [Input('text_area_exam_teacher', 'value'), Input('text_area_answers_teacher', 'value'), Input('K_neighbors_teacher', 'value')])
-def CategorizeQuestions(text_exam, text_answers, k_neighbors ):
+@app.callback(Output('table_teacher', 'rows'), [Input('subject_teacher', 'value'), Input('state_teacher', 'children'), Input('K_neighbors_teacher', 'value')])
+def CategorizeQuestions(subject, state_teacher, k_neighbors ):
     df_result = pd.DataFrame()
+    obj = GetTeacherObject(subject)
     try:
-        Answers = ExtractAnswersFromText(text_answers)
-        df_result, df_feature_to_storage = CategorizeATest(text_exam, Answers, k_neighbors, 50)
-        SubFunctions().WriteDataFrimeToSQLDatabase(df_feature_to_storage, 'FeatureToStore')
+        df_result = obj.CategorizeQuestions(state_teacher, k_neighbors )
     except():
-        #TypeError, AttributeError , IndexError, ValueError, KeyError
         pass
     return df_result.to_dict('records')
 
 @app.callback(  Output('status_teacher', 'children'),[Input('submit_button_teacher', 'n_clicks'), Input('table_teacher', 'rows')],
-                state=[State('subject_teacher', 'value'),State('test_number_teacher', 'value'),State('complete_confirm_teacher', 'value'),])
+                state=[State('subject_teacher', 'value'),State('test_number_teacher', 'value'), State('complete_confirm_teacher', 'value'),])
 def UpdateDataToDatabase(n_clicks, rows, subject, test_number, complete_confirm):
     if n_clicks != None:
-        obj = EnglishTeacher() if subject == Subjects[0] else (MathTeacher() if subject == Subjects[1] else PhysicsTeacher())
+        obj = GetTeacherObject(subject)
         state = obj.CheckComponentsToGetRawData(test_number, complete_confirm)
         if state is not None: return state
         df = pd.DataFrame(rows)
@@ -86,13 +108,16 @@ def UpdateDataToDatabase(n_clicks, rows, subject, test_number, complete_confirm)
 @app.callback(Output('state_student', 'children'),[Input('subject_student', 'value')])
 def GetState(subject):
     try:
-        number_done_test_your = int(len(SubFunctions().ReadDataFrameFromMySQL(FilesStudent[subject])) / NumberRowsOfOwnDataForOneTestStudent[subject])
-    except KeyError:
+        obj = GetStudentObject(subject)
+        number_done_test_your = obj.GetNumberOfDoneTests(obj.file_raw_data_student, obj.number_rows_of_own_one_test)
+    except (AttributeError):
         return 'You need to select subject in above dropdown'
-    return u'In this subject you have done {} test next be {}'.format(number_done_test_your,number_done_test_your+1)
+    return 'You are doing test No ' + str(number_done_test_your + 1)
+
 @app.callback(  Output('status', 'children'),[Input('submit_button_student', 'n_clicks')],state=[
 State('subject_student', 'value'),
 State('test_number_student', 'value'),
+State('complete_confirm_student', 'value'),
 State('input1', 'value'),
 State('input2', 'value'),
 State('input3', 'value'),
@@ -142,16 +167,15 @@ State('input46', 'value'),
 State('input47', 'value'),
 State('input48', 'value'),
 State('input49', 'value'),
-State('input50', 'value'),
-State('complete_confirm_student', 'value'),])
-def update_output(n_clicks, tab, test_number,
+State('input50', 'value')])
+def update_output(n_clicks, tab, test_number, complete_confirm,
                   input1, input2, input3, input4, input5, input6, input7, input8, input9, input10,
                   input11, input12, input13, input14, input15, input16, input17, input18, input19, input20,
                   input21, input22, input23, input24, input25, input26, input27, input28, input29, input30,
                   input31, input32, input33, input34, input35, input36, input37, input38, input39, input40,
-                  input41, input42, input43, input44, input45, input46, input47, input48, input49, input50, complete_confirm):
+                  input41, input42, input43, input44, input45, input46, input47, input48, input49, input50):
     if n_clicks != None:
-        obj = EnglishStudent() if tab == Subjects[0] else (MathStudent() if tab == Subjects[1] else PhysicsStudent())
+        obj = GetStudentObject(tab)
         state = obj.CheckComponentsToGetRawData(test_number, complete_confirm)
         if state is not None: return state
         list_options = [input1, input2, input3, input4, input5, input6, input7, input8, input9, input10,
@@ -159,7 +183,7 @@ def update_output(n_clicks, tab, test_number,
                         input21, input22, input23, input24, input25, input26, input27, input28, input29, input30,
                         input31, input32, input33, input34, input35, input36, input37, input38, input39, input40,
                         input41, input42, input43, input44, input45, input46, input47, input48, input49, input50]
-        return obj.UpdateRawDataForObject(list_options)
+        return obj.UpdateRawDataForClass(list_options)
     return 'Status: You can start'
 if __name__ == '__main__':
     app.run_server()

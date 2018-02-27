@@ -1,103 +1,8 @@
-import numpy as np
-import pandas as pd
 import warnings;warnings.filterwarnings('ignore')
-from Dataset import *
-from TextPreprocessingFunctionalStyle import DeleteWhiteSpaceInFrontAndBack
-from sqlalchemy import create_engine
 from datetime import datetime
-
-regime = 3
-
-if regime == 3 :
-    import sshtunnel
-    sshtunnel.SSH_TIMEOUT = 5.0
-    sshtunnel.TUNNEL_TIMEOUT = 5.0
-    ssh = ('ssh.pythonanywhere.com');
-    un = 'ledaiduongvnth';
-    pwd = 'leduysao290893';
-    lcad = ('localhost', 3333);
-    rmad = ('ledaiduongvnth.mysql.pythonanywhere-services.com', 3306)
-
-class SubFunctions:
-    def __init__(self):pass
-
-    def CreateEngineToConnectToMySQLServer(self,regime, server = None):
-        if regime == 1:
-            # Create engine in server cloud pythonanywhere
-            engine = create_engine(
-                'mysql+mysqldb://ledaiduongvnth:leduysao290893@ledaiduongvnth.mysql.pythonanywhere-services.com/ledaiduongvnth$CheckScoreTin1')
-        elif regime == 2:
-            # Create engine in local machine
-            engine = create_engine('mysql+mysqldb://d:d@localhost/CheckScoreTin')
-        elif regime == 3:
-            # Create engine to access to MySQL server from local machine
-            engine = create_engine('mysql+mysqldb://ledaiduongvnth:leduysao290893@127.0.0.1:%s/ledaiduongvnth$CheckScoreTin1' % server.local_bind_port)
-        return engine
-
-    def ReadDataFrameFromMySQL(self, path):
-        if regime == 3:
-            with sshtunnel.SSHTunnelForwarder(ssh, ssh_username=un, ssh_password=pwd, local_bind_address=lcad,
-                                              remote_bind_address=rmad) as server:
-                engine = self.CreateEngineToConnectToMySQLServer(regime ,server=server)
-                with engine.connect() as conn, conn.begin():
-                    df = pd.read_sql_table(path, conn)
-                server.close()
-        else:
-            engine = self.CreateEngineToConnectToMySQLServer(regime)
-            with engine.connect() as conn, conn.begin():
-                df = pd.read_sql_table(path, conn)
-        return df
-
-    def WriteDataFrimeToSQLDatabase(self, df, table):
-        if regime == 3 :
-            with sshtunnel.SSHTunnelForwarder((ssh), ssh_username=un, ssh_password=pwd, local_bind_address=lcad,
-                                              remote_bind_address=rmad) as server:
-                engine = self.CreateEngineToConnectToMySQLServer(regime, server=server)
-                with engine.connect() as conn, conn.begin():
-                    df.to_sql(table, engine, if_exists='replace', index=False)
-                server.close()
-        else :
-            engine = self.CreateEngineToConnectToMySQLServer(regime)
-            df.to_sql(table, engine, if_exists='replace', index=False)
-
-    def AddSeriesOrListToRowOfDataFrameByIndexEqualLength(self,path,series_or_list):
-        series = pd.Series(series_or_list)
-        df_origin = self.ReadDataFrameFromMySQL(path)
-        df_update = pd.DataFrame(index= ['0'], columns= df_origin.columns )
-        len_series = len(series.index.tolist())
-        len_columns_data_frame = len(df_update.columns)
-        if len_series == len_columns_data_frame:
-            for index in np.arange(0, len_series): df_update.set_value('0', df_update.columns[index], series[index])
-            df_origin = df_origin.append(df_update, ignore_index=True)
-            self.WriteDataFrimeToSQLDatabase(df_origin, path)
-        else: raise ValueError('columns length of dataframe not equal length of series')
-
-    def AddSeriesToRowOfDataFrameByName(self,path,series):
-        df_origin = self.ReadDataFrameFromMySQL(path)
-        df_update = pd.DataFrame(index= ['0'], columns= df_origin.columns )
-        for index in series.index.tolist(): df_update.set_value('0', index, series[index])
-        df_origin = df_origin.append(df_update, ignore_index=True)
-        self.WriteDataFrimeToSQLDatabase(df_origin, path)
-
-    def RemoveRows(self, path, list_of_rows):
-        df = self.ReadDataFrameFromMySQL(path)
-        df = df.drop(list_of_rows)
-        self.WriteDataFrimeToSQLDatabase(df, path)
-
-    def RemoveAllRows(self, path):
-        df = self.ReadDataFrameFromMySQL(path)
-        df = df.drop(df.index.tolist())
-        self.WriteDataFrimeToSQLDatabase(df, path)
-
-    def RemoveColumns(self, path, list_of_columns):
-        df = self.ReadDataFrameFromMySQL(path)
-        df = df.drop(columns=list_of_columns)
-        self.WriteDataFrimeToSQLDatabase(df, path)
-
-    def WriteToExcel(self, df, path):
-        writer = pd.ExcelWriter(path)
-        df.to_excel(writer)
-        writer.save()
+from mongdb import *
+from NatureLanguageProcessing import *
+from SubFunctions import *
 
 class Person(SubFunctions):
     def __init__(self, file_raw_data, tab, number_rows_of_own_one_test ):
@@ -112,6 +17,10 @@ class Person(SubFunctions):
         if check_test_number is False: return 'Status: Test number is wrong, you need to choose your right test number'
         completed = complete_confirm == 'I have done'
         if completed is False: return 'Status: You do not complete your test, click to <I have done> to confirm your completion'
+
+    def GetNumberOfDoneTests(self, file, number_rows_one_test):
+        number_done_test_your = int(len(self.ReadDataFrameFromMySQL(file)) / number_rows_one_test)
+        return number_done_test_your
 
 class Subject(SubFunctions):
     def __init__(self, file_preprocessed_data, file_raw_data_student, file_raw_data_teacher,
@@ -232,6 +141,7 @@ class EnglishTeacher(Teacher):
                          self.number_rows_of_own_one_test,
                          categories_of_subject= self.categories_of_subject,
                          number_questions_of_subject= self.number_questions_of_subject)
+
     def UpdateRawDataForObject(self, Answers, Categories):
         Categories = [DeleteWhiteSpaceInFrontAndBack(category) for category in Categories]
         Answers = [DeleteWhiteSpaceInFrontAndBack(ans) for ans in Answers]
@@ -244,6 +154,24 @@ class EnglishTeacher(Teacher):
         df_trainning_data_new = pd.concat([df_trainning_data, df_feature_to_storage.drop(columns=['Index'])], axis=0, ignore_index= True)
         self.WriteDataFrimeToSQLDatabase(df_trainning_data_new, 'TrainningData')
         return 'Status: Your test is sent successfully, if you want to do next test you must click round button in top left conner to reload webpage'
+
+    def CategorizeQuestions(self, state_teacher, k_neighbors):
+        test_number = state_teacher[state_teacher.find('test No ') + len('test No '): len(state_teacher)]
+        dict = list(ReadDocumentFromColection('DictionariesAllTests', {'test_number': test_number}))[0]
+        df_result, df_feature_to_storage, list_unlabeled_questions = ConvertDictionaryToDataFrameToStore(dict, dict[
+            'Answers'], k_neighbors, 50)
+        status = [FillHeader2(dict['question' + str(i)], i) for i in list_unlabeled_questions]
+        # Create and megre unlabled data frame
+        df_unlabled = pd.DataFrame()
+        df_unlabled['Index'] = list_unlabeled_questions
+        df_unlabled['Header'] = [dict['question' + str(i)]['header2'] for i in list_unlabeled_questions]
+        df_unlabled['Options'] = list(
+            map(RepairOption, [dict['question' + str(i)]['options'] for i in list_unlabeled_questions]))
+        df_result = pd.concat([df_result.set_index('Index'), df_unlabled.set_index('Index')], axis=1)
+        self.WriteDataFrimeToSQLDatabase(df_feature_to_storage, 'FeatureToStore')
+        return df_result
+
+
 class EnglishStudent(Student, Subject):
     def __init__(self):
         self.tab = 'English student'
@@ -260,8 +188,6 @@ class EnglishStudent(Student, Subject):
                          file_raw_data_student= self.file_raw_data_student,
                          file_raw_data_teacher= self.file_raw_data_teacher,
                          number_rows_of_one_test_of_teacher= self.number_rows_of_one_test_of_teacher)
-    def UpdateRawDataForObject(self, list_options):
-        return self.UpdateRawDataForClass(list_options)
     def UpdateAllTest(self):
         tests_ready_to_scan = self.CheckAllNewTests()
         if len(tests_ready_to_scan) > 0:
@@ -280,10 +206,15 @@ class MathTeacher(Teacher):
                          self.number_rows_of_own_one_test,
                          categories_of_subject= self.categories_of_subject,
                          number_questions_of_subject= self.number_questions_of_subject)
-    def UpdateRawDataForObject(self, list_options):
-        if self.UpdateRawDataForClass(list_options) == 'Status: Anwers form is wrong, you need to repair your anwers':
+    def UpdateRawDataForObject(self, list_options, categories):
+        if self.UpdateRawDataForClass(list_options, categories) == 'Status: Anwers form is wrong, you need to repair your anwers':
             return 'Status: Anwers form is wrong, you need to repair your anwers'
         return 'Status: Your test is sent successfully, if you want to do next test you must click round button in top left conner to reload webpage'
+
+    def CategorizeQuestions(self, state_teacher, k_neighbors):
+        df_result = self.ReadDataFrameFromMySQL('MathIntermediateData')
+        return df_result
+
 class MathStudent(Student, Subject):
     def __init__(self):
         self.tab = 'Math student'
@@ -300,8 +231,6 @@ class MathStudent(Student, Subject):
                          file_raw_data_student= self.file_raw_data_student,
                          file_raw_data_teacher= self.file_raw_data_teacher,
                          number_rows_of_one_test_of_teacher= self.number_rows_of_one_test_of_teacher)
-    def UpdateRawDataForObject(self, list_options):
-        return self.UpdateRawDataForClass(list_options)
     def UpdateAllTest(self):
         tests_ready_to_scan = self.CheckAllNewTests()
         if len(tests_ready_to_scan) > 0:
@@ -320,10 +249,15 @@ class PhysicsTeacher(Teacher):
                          self.number_rows_of_own_one_test,
                          categories_of_subject= self.categories_of_subject,
                          number_questions_of_subject= self.number_questions_of_subject)
-    def UpdateRawDataForObject(self, list_options):
-        if self.UpdateRawDataForClass(list_options) == 'Status: Anwers form is wrong, you need to repair your anwers':
+    def UpdateRawDataForObject(self, list_options, categories):
+        if self.UpdateRawDataForClass(list_options, categories) == 'Status: Anwers form is wrong, you need to repair your anwers':
             return 'Status: Anwers form is wrong, you need to repair your anwers'
         return 'Status: Your test is sent successfully, if you want to do next test you must click round button in top left conner to reload webpage'
+
+    def CategorizeQuestions(self, state_teacher, k_neighbors):
+        df_result = self.ReadDataFrameFromMySQL('PhysicsIntermediateData')
+        return df_result
+
 class PhysicsStudent(Student, Subject):
     def __init__(self):
         self.tab = 'Physics student'
@@ -340,10 +274,72 @@ class PhysicsStudent(Student, Subject):
                          file_raw_data_student= self.file_raw_data_student,
                          file_raw_data_teacher= self.file_raw_data_teacher,
                          number_rows_of_one_test_of_teacher= self.number_rows_of_one_test_of_teacher)
-    def UpdateRawDataForObject(self, list_options):
-        return self.UpdateRawDataForClass(list_options)
     def UpdateAllTest(self):
         tests_ready_to_scan = self.CheckAllNewTests()
         if len(tests_ready_to_scan) > 0:
             for test in tests_ready_to_scan:
                 self.UpdateATest(test)
+
+
+
+class EnglishAdmin(SubFunctions):
+    def __init__(self):
+        SubFunctions.__init__(self)
+    def GetNumberOfDoneTests(self):
+        return ReadNumberOfDocuments('DictionariesAllTests')
+
+    def UpdateDataToDatabase(self, text_answers, text_exam, test_number, complete_confirm):
+        Answers = ExtractAnswersFromText(text_answers)
+        dict = ConvertATestToDictionary(text_exam, Answers, test_number)
+        df_result, df_feature_to_storage, list_unlabeled_questions = ConvertDictionaryToDataFrameToStore(dict, Answers, 1, 50)
+        if complete_confirm == 'I have done':
+            AddDocumentToColection('DictionariesAllTests', dict)
+        return df_result
+
+
+class MathAdmin(SubFunctions):
+    def __init__(self):
+        SubFunctions.__init__(self)
+
+    def GetNumberOfDoneTests(self):
+        return int(len(self.ReadDataFrameFromMySQL('MathTeacherCategories'))/2)
+
+    def UpdateDataToDatabase(self, text_answers, text_exam, test_number, complete_confirm):
+        Answers = ExtractAnswersFromText(text_answers)
+        dict = ConvertATestToDictionary(text_exam, Answers, test_number)
+        df_result = CategorizeQuestionsMath()
+        if complete_confirm == 'I have done':
+            self.WriteDataFrimeToSQLDatabase(df_result, 'MatIntermediateData')
+        return df_result
+
+class PhysicsAdmin(SubFunctions):
+    def __init__(self):
+        SubFunctions.__init__(self)
+
+    def GetNumberOfDoneTests(self):
+        return int(len(self.ReadDataFrameFromMySQL('MathTeacherCategories'))/2)
+
+    def UpdateDataToDatabase(self, text_answers, text_exam, test_number, complete_confirm):
+        Answers = ExtractAnswersFromText(text_answers)
+        dict = ConvertATestToDictionary(text_exam, Answers, test_number)
+        df_result = CategorizeQuestionsPhysics()
+        if complete_confirm == 'I have done':
+            self.WriteDataFrimeToSQLDatabase(df_result, 'MatIntermediateData')
+        return df_result
+
+
+
+def GetStudentObject(tab):
+    if tab == Subjects[0]: return EnglishStudent()
+    elif tab == Subjects[1]: return MathStudent()
+    elif tab == Subjects[2]: return PhysicsStudent()
+
+def GetTeacherObject(tab):
+    if tab == Subjects[0]: return EnglishTeacher()
+    elif tab == Subjects[1]: return MathTeacher()
+    elif tab == Subjects[2]: return PhysicsTeacher()
+
+def GetAdminObject(tab):
+    if tab == Subjects[0]: return EnglishAdmin()
+    elif tab == Subjects[1]: return MathAdmin()
+    elif tab == Subjects[2]: return PhysicsAdmin()

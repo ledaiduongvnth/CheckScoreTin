@@ -41,23 +41,26 @@ def GetSubTextsInsighDelimitersToList(doc_str, list_delimiters, get_head = True,
 
 def ProcessAExercise(Exercises):
     list_questions = GetSubTextsInsighDelimitersToList(Exercises,['Question'])
-    header1 = DeleteWhiteSpaceInFrontAndBack(DeleteListCharacterFromString(sent_tokenize(list_questions.pop(0).replace('\n', ' '), language='english')[0], ['\t'])).lower()
-    def UniformAQuestion(question, header1):
+    header1_header11 = sent_tokenize(list_questions.pop(0).replace('\n', ' '))
+    header1 = DeleteWhiteSpaceInFrontAndBack(DeleteListCharacterFromString(header1_header11.pop(0), ['\t'])).lower()
+    header11 = header1_header11
+    def UniformAQuestion(question, header1, header11):
         list_options = [DeleteWhiteSpaceInFrontAndBack(DeleteListCharacterFromString(option.replace('\n', ' ').replace('/', ' ').replace('-', ' ').replace("’", "'"), ['\t', 'A.', 'B.', 'C.', 'D.', '(', ')', '.', ',', '?', '!', ';'] + list('1234567890'))).lower()
                         for option in GetSubTextsInsighDelimitersToList(question, ['A.', 'B.', 'C.', 'D.'])]
         header2 = DeleteWhiteSpaceInFrontAndBack(DeleteListCharacterFromString(list_options.pop(0).replace('\n', ' '), list('1234567890') +['\t', 'question', ':'])).lower()
-        dict_questions = {'header1': header1,'header2': header2, 'options': list_options}
+        dict_questions = {'header1': header1,'header11': header11,'header2': header2, 'options': list_options}
         return dict_questions
-    list_uniformed_questions = [UniformAQuestion(question, header1) for question in list_questions]
+    list_uniformed_questions = [UniformAQuestion(question, header1, header11) for question in list_questions]
     return list_uniformed_questions
 
-def ExtractATestToDictionary(doc, list_delimiters_0, get_head=True, get_tail=True):
-    list_exercises = GetSubTextsInsighDelimitersToList(doc, list_delimiters_0, get_head=get_head, get_tail=get_tail)
+def ExtractATestToDictionary(text_exam, Answers, list_delimiters_0, test_number, get_head=True, get_tail=True):
+    list_exercises = GetSubTextsInsighDelimitersToList(text_exam, list_delimiters_0, get_head=get_head, get_tail=get_tail)
     list_total_questions = []
     for exercices in list_exercises: list_total_questions = list_total_questions + ProcessAExercise(exercices)
     dict_a_test = {}
     for i, question in list(enumerate(list_total_questions)): dict_a_test['question'+str(i+1)] = question
-    pprint(dict_a_test)
+    dict_a_test['test_number'] = test_number
+    dict_a_test['Answers'] = Answers
     return dict_a_test
 
 def ConvertADictionaryToDataFrame(dict_a_test):

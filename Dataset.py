@@ -1,5 +1,20 @@
 from sklearn.preprocessing import LabelEncoder
 
+
+regime = 2
+
+if regime == 3 :
+    import sshtunnel
+    sshtunnel.SSH_TIMEOUT = 5.0
+    sshtunnel.TUNNEL_TIMEOUT = 5.0
+    ssh = ('ssh.pythonanywhere.com');
+    un = 'ledaiduongvnth';
+    pwd = 'leduysao290893';
+    lcad = ('localhost', 3333);
+    rmad = ('ledaiduongvnth.mysql.pythonanywhere-services.com', 3306)
+
+
+
 # English
 EnglishCategory = ['Pronunciation', 'Stress',
                    'Noun', 'Adjective_Adverb','Conjunction', 'Articles_a_an_the',  'Prepositions', 'Phrasal_verb', 'Verb',
@@ -28,23 +43,9 @@ PhysicsCategory = ['Mechanical oscillation',
                    'Light waves',
                    'Quantum of light',
                    'Atomic nucleus']
-FileTeacher = {'English': 'EnglishTeacherCategories',
-        'Math': 'MathTeacherCategories',
-        'Physics': 'PhysicsTeacherCategories'}
-FilesStudent = {
-        'English': 'EnglishStudentAnwers',
-        'Math': 'MathStudentAnwers',
-        'Physics': 'PhysicsStudentAnwers'}
 Categories = {'English': EnglishCategory,
             'Math': MathCategory,
             'Physics': PhysicsCategory}
-NumberRowsOfOwnDataForOneTestTeacher = {'English': 2,'Math': 2,'Physics': 2}
-NumberRowsOfOwnDataForOneTestStudent = {
-                        'English': 1,
-                        'Math': 1,
-                        'Physics': 1}
-
-
 list_pos_tag = ['CC', 'CD', 'DT', 'EX', 'FW', 'IN', 'JJ', 'JJR', 'JJS', 'LS', 'MD', 'NN', 'NNS', 'NNP', 'NNPS', 'PDT', 'POS', 'PRP', 'PRP$', 'RB', 'RBR', 'RBS', 'RP', 'TO', 'UH', 'VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ', 'WDT', 'WP', 'WP$', 'WRB']
 LabelEncoderPosTag = LabelEncoder()
 LabelEncoderPosTag.fit(list_pos_tag)
@@ -56,7 +57,7 @@ list_delimiters_0 = ['Mark the letter', 'Blacken the letter', 'Read the followin
 Subjects = ['English', 'Math','Physics']
 Algorithm = ['K nearest neighbor', 'Support vector machine', 'Tree decision']
 Options = ['A', 'B', 'C', 'D']
-NumberQuestions = {'English': 50, 'Math': 50, 'Physics':40}
+
 
 
 

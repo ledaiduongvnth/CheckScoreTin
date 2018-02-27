@@ -3,7 +3,7 @@ import pandas as pd
 import ast
 from nltk import word_tokenize, pos_tag
 from Dataset import *
-from ProcessData import *
+from SubFunctions import *
 from TextPreprocessingFunctionalStyle import *
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn import svm
@@ -47,12 +47,17 @@ def UniformFeature(feature, standart_length):
     uniformed_feature[0:length_intite] = feature
     return uniformed_feature.tolist()
 
-def CategorizeATest(text, Answers, k_neighbors, length_feature):
-    # Convert raw text to DataFrame
+def ConvertATestToDictionary(text_exam, Answers, test_number):
     try:
-        df = ConvertADictionaryToDataFrame(ExtractATestToDictionary(text, list_delimiters_0, get_head=False, get_tail=False))
+        dict = ExtractATestToDictionary(text_exam, Answers, list_delimiters_0,test_number, get_head=False, get_tail=False)
+
     except KeyError:
-        df = ConvertADictionaryToDataFrame(ExtractATestToDictionary(text, list_delimiters_0, get_head=True, get_tail=True))
+        dict = ExtractATestToDictionary(text_exam, Answers, list_delimiters_0,test_number, get_head=True, get_tail=True)
+    return dict
+
+
+def ConvertDictionaryToDataFrameToStore(dict, Answers, k_neighbors, length_feature):
+    df = ConvertADictionaryToDataFrame(dict)
     # Get Trainning Data and their lables from Database
     df_trainning = SubFunctions().ReadDataFrameFromMySQL('TrainningData')
     df_trainning['Feature'] = df_trainning['Feature'].apply(ast.literal_eval)
@@ -66,11 +71,11 @@ def CategorizeATest(text, Answers, k_neighbors, length_feature):
     feature_to_storage = [ExtractFeaturesFromOptions(option) for option in list(df_unlabled['options'])]
     df_feature_to_storage = pd.DataFrame()
     df_feature_to_storage['Index'] = df_unlabled['Index']
-    df_feature_to_storage['Feature'] = pd.Series(feature_to_storage,name = 'Feature', index= df_feature_to_storage.index)
+    df_feature_to_storage['Feature'] = pd.Series(feature_to_storage, name='Feature', index=df_feature_to_storage.index)
     df_feature_to_storage['Feature'] = df_feature_to_storage['Feature'].apply(str)
     data_test = np.array([UniformFeature(feature, length_feature) for feature in feature_to_storage])
-    #Test new data
-    clf = KNeighborsClassifier(n_neighbors= k_neighbors)
+    # Test new data
+    clf = KNeighborsClassifier(n_neighbors=k_neighbors)
     clf.fit(data_trainning, lables)
     numerical_lable = clf.predict(data_test)
     categorical_lable = list(LabelEncoderEnglishCategory.inverse_transform(numerical_lable))
@@ -81,4 +86,20 @@ def CategorizeATest(text, Answers, k_neighbors, length_feature):
     df_result['Index'] = range(1, 51)
     df_result['Category'] = list(df['Category'])
     df_result['Answers'] = Answers
-    return df_result, df_feature_to_storage
+    return df_result, df_feature_to_storage, [(i+1) for i in list(df_unlabled['Index'])]
+
+def FillHeader2(question, number_question):
+    if DeleteListCharacterFromString(question['header2'], [' ']) == '':
+        list_indexs = list(map(lambda x: x.find('('+str(number_question)+')'), question['header11']))
+        print(list_indexs, number_question)
+        index_header2 = list_indexs.index(list(filter(lambda x: x != -1, list_indexs))[0])
+        question['header2'] = question['header11'][index_header2]
+        return True
+    return False
+def RepairOption(options):
+    a = ''
+    for i in options:
+        a = a + i + '>  <'
+    return a
+
+
