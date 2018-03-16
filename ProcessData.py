@@ -51,18 +51,20 @@ class Subject(SubFunctions):
         df['Score'] = np.where(df.AnwersUser == df.AnwersCorrect, 1, 0)
         df_result['Percentage'] = 100 * df.groupby('Categories').sum()['Score'] / df.groupby('Categories').count()['Score']
         score = 10 * df['Score'].sum() / df['Score'].count()
-        effectioncy = 10 * len([answer for answer in list_anwers_user if answer != None])/df['Score'].count()
-        return [df_result,Datetime, score, effectioncy]
+        filling_up = 10 * len([answer for answer in list_anwers_user if answer != None])/df['Score'].count()
+        effectioncy = 10 * score / filling_up
+        return [df_result,Datetime, score, effectioncy, filling_up]
 
     def UpdateATest(self, test_oder):
         categories = list(self.ReadDataFrameFromMySQL(self.file_raw_data_teacher).loc[test_oder * self.number_rows_of_one_test_of_teacher - 1, :])
         anwrers_correct = list(self.ReadDataFrameFromMySQL(self.file_raw_data_teacher).loc[test_oder * self.number_rows_of_one_test_of_teacher - self.number_rows_of_one_test_of_teacher, :])
         list_anwers_user = list(self.ReadDataFrameFromMySQL(self.file_raw_data_student).loc[test_oder - 1, :])
-        [df_type, Datetime, score, effectioncy] = self.ProcessATest(categories, anwrers_correct, list_anwers_user)
+        [df_type, Datetime, score, effectioncy, filling_up] = self.ProcessATest(categories, anwrers_correct, list_anwers_user)
         df_score = pd.DataFrame(data=[[score]], index=['Score'], columns=['Percentage'])
         df_effectioncy = pd.DataFrame(data=[[effectioncy]], index=['Effectioncy'], columns=['Percentage'])
+        df_filling_up = pd.DataFrame(data=[[filling_up]], index=['Filling_up'], columns=['Percentage'])
         df_date_time = pd.DataFrame(data=[[Datetime]], index=['Datetime'], columns=['Percentage'])
-        df_result = pd.concat([df_date_time, df_score, df_effectioncy, df_type], axis=0)
+        df_result = pd.concat([df_date_time, df_score, df_effectioncy, df_filling_up, df_type], axis=0)
         self.AddSeriesToRowOfDataFrameByName(self.file_preprocessed_data, df_result['Percentage'])
 
 class Teacher(Person):
@@ -105,6 +107,12 @@ class Student(Person):
                 'y': df['Score'],
                 'name': 'Score',
                 'marker': {'color': 'rgb(255, 0, 0)'},
+            },
+            {
+                'x': df['Datetime'],
+                'y': df['Filling_up'],
+                'name': 'Filling_up',
+                'marker': {'color': 'rgb(0, 0, 0)'},
             },
             {
                 'x': df['Datetime'],
@@ -168,6 +176,7 @@ class EnglishTeacher(Teacher):
         df_unlabled['Options'] = list(
             map(RepairOption, [dict['question' + str(i)]['options'] for i in list_unlabeled_questions]))
         df_result = pd.concat([df_result.set_index('Index'), df_unlabled.set_index('Index')], axis=1)
+        df_result['Index'] = list(range(1, 51))
         self.WriteDataFrimeToSQLDatabase(df_feature_to_storage, 'FeatureToStore')
         return df_result
 
@@ -317,16 +326,14 @@ class PhysicsAdmin(SubFunctions):
         SubFunctions.__init__(self)
 
     def GetNumberOfDoneTests(self):
-        return int(len(self.ReadDataFrameFromMySQL('MathTeacherCategories'))/2)
+        return int(len(self.ReadDataFrameFromMySQL('PhysicsTeacherCategories'))/2)
 
     def UpdateDataToDatabase(self, text_answers, text_exam, test_number, complete_confirm):
         Answers = ExtractAnswersFromText(text_answers)
-        dict = ConvertATestToDictionary(text_exam, Answers, test_number)
-        df_result = CategorizeQuestionsPhysics()
+        df_result = CategorizePhysicsTest(Answers, text_exam)
         if complete_confirm == 'I have done':
-            self.WriteDataFrimeToSQLDatabase(df_result, 'MatIntermediateData')
+            self.WriteDataFrimeToSQLDatabase(df_result, 'PhysicsIntermediateData')
         return df_result
-
 
 
 def GetStudentObject(tab):

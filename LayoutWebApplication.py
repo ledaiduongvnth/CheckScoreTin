@@ -52,8 +52,8 @@ layout_teacher = html.Div([
     dt.DataTable(
         rows=[{}],
         editable=True,
-        columns= ['Options', 'Header', 'Category'],
-        column_widths= [500, 1100, 200],
+        columns= ['Index', 'Options', 'Header', 'Category'],
+        column_widths= [100, 400, 1100, 200],
         id='table_teacher'),
     html.Div(id='grammal', children = 'Noun Pronoun Adjective_Adverb Conjunction Articles_a_an_the Prepositions Phrasal_verb Verb Model_verb Verb_tenses Passive_voice Conditinal'),
     html.Div(id='grammal1',children='Gerund_infinitive_participle Tag_Question Inversion Relative_clause Direct_indirect_sentence Comparison Subject_verb_agreement Identify_formation_of_words '),

@@ -4,50 +4,19 @@ import warnings;warnings.filterwarnings('ignore')
 from Dataset import *
 from sqlalchemy import create_engine
 
-
+engine = create_engine('mysql+mysqldb://ledaiduongvnth:leduysao290893@ledaiduongvnth.mysql.pythonanywhere-services.com/ledaiduongvnth$CheckScoreTin', pool_recycle=280)
 
 
 class SubFunctions:
     def __init__(self):pass
 
-    def CreateEngineToConnectToMySQLServer(self,regime, server = None):
-        if regime == 1:
-            # Create engine in server cloud pythonanywhere
-            engine = create_engine(
-                'mysql+mysqldb://ledaiduongvnth:leduysao290893@ledaiduongvnth.mysql.pythonanywhere-services.com/ledaiduongvnth$CheckScoreTin1')
-        elif regime == 2:
-            # Create engine in local machine
-            engine = create_engine('mysql+mysqldb://d:d@localhost/CheckScoreTin')
-        elif regime == 3:
-            # Create engine to access to MySQL server from local machine
-            engine = create_engine('mysql+mysqldb://ledaiduongvnth:leduysao290893@127.0.0.1:%s/ledaiduongvnth$CheckScoreTin1' % server.local_bind_port)
-        return engine
-
     def ReadDataFrameFromMySQL(self, path):
-        if regime == 3:
-            with sshtunnel.SSHTunnelForwarder(ssh, ssh_username=un, ssh_password=pwd, local_bind_address=lcad,
-                                              remote_bind_address=rmad) as server:
-                engine = self.CreateEngineToConnectToMySQLServer(regime ,server=server)
-                with engine.connect() as conn, conn.begin():
-                    df = pd.read_sql_table(path, conn)
-                server.close()
-        else:
-            engine = self.CreateEngineToConnectToMySQLServer(regime)
-            with engine.connect() as conn, conn.begin():
-                df = pd.read_sql_table(path, conn)
+        with engine.connect() as conn, conn.begin():
+            df = pd.read_sql_table(path, conn)
         return df
 
     def WriteDataFrimeToSQLDatabase(self, df, table):
-        if regime == 3 :
-            with sshtunnel.SSHTunnelForwarder((ssh), ssh_username=un, ssh_password=pwd, local_bind_address=lcad,
-                                              remote_bind_address=rmad) as server:
-                engine = self.CreateEngineToConnectToMySQLServer(regime, server=server)
-                with engine.connect() as conn, conn.begin():
-                    df.to_sql(table, engine, if_exists='replace', index=False)
-                server.close()
-        else :
-            engine = self.CreateEngineToConnectToMySQLServer(regime)
-            df.to_sql(table, engine, if_exists='replace', index=False)
+        df.to_sql(table, engine, if_exists='replace', index=False)
 
     def AddSeriesOrListToRowOfDataFrameByIndexEqualLength(self,path,series_or_list):
         series = pd.Series(series_or_list)
@@ -87,3 +56,8 @@ class SubFunctions:
         writer = pd.ExcelWriter(path)
         df.to_excel(writer)
         writer.save()
+
+    def WriteToCSV(self, path):
+        df = self.ReadDataFrameFromMySQL(path)
+        df.to_csv(path+'.csv')
+

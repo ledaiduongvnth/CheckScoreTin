@@ -7,6 +7,9 @@ from SubFunctions import *
 from TextPreprocessingFunctionalStyle import *
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn import svm
+import functools
+import operator
+import itertools
 
 def FirtsStepCategozineBySeaching(df):
     list_conditions = [lambda x: 'pronou' in x or 'pronunciation' in x, lambda x: 'stress' in x,
@@ -101,5 +104,16 @@ def RepairOption(options):
     for i in options:
         a = a + i + '>  <'
     return a
+
+def CategorizePhysicsTest(Answers, text_exam):
+    list_questions = GetSubTextsInsighDelimitersToList(text_exam , list_delimiters_physics, get_head= False, get_tail= False )
+    df_result = pd.DataFrame()
+    df_result['Index'] = list(range(1, 41))
+    df_result['Header'] = list_questions
+    df_result['Answers'] = Answers
+    conditions = [df_result['Header'].apply(lambda raw_text_question: functools.reduce(operator.or_, map(functools.partial(lambda y, x: x in y, raw_text_question), list_indicator)))
+                  for list_indicator in PhysicsIndicatorsList]
+    df_result['Category'] = np.select(conditions, PhysicsCategory)
+    return df_result.drop(columns=['Header'])
 
 
